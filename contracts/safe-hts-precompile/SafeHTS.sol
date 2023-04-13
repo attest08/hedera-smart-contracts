@@ -42,9 +42,9 @@ abstract contract SafeHTS {
     error UpdateTokenExpiryInfoFailed();
     error UpdateTokenKeysFailed();
 
-    function safeCryptoTransfer(IHederaTokenService.TokenTransferList[] memory tokenTransfers) internal {
+    function safeCryptoTransfer(IHederaTokenService.TransferList memory transferList, IHederaTokenService.TokenTransferList[] memory tokenTransfers) internal {
         (bool success, bytes memory result) = precompileAddress.call(
-            abi.encodeWithSelector(IHederaTokenService.cryptoTransfer.selector, tokenTransfers));
+            abi.encodeWithSelector(IHederaTokenService.cryptoTransfer.selector, transferList, tokenTransfers));
         if (!tryDecodeSuccessResponseCode(success, result)) revert CryptoTransferFailed();
     }
 

@@ -52,8 +52,8 @@ contract SafeOperations is SafeHTS {
         emit ResponseCode(HederaResponseCodes.SUCCESS);
     }
 
-    function safeCryptoTransferPublic(IHederaTokenService.TokenTransferList[] memory tokenTransfers) external {
-        safeCryptoTransfer(tokenTransfers);
+    function safeCryptoTransferPublic(IHederaTokenService.TransferList calldata transferList, IHederaTokenService.TokenTransferList[] calldata tokenTransferList) external {
+        safeCryptoTransfer(transferList, tokenTransferList);
         emit ResponseCode(HederaResponseCodes.SUCCESS);
     }
 

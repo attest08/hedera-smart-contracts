@@ -116,21 +116,21 @@ describe.only("SafeHTS library Test Suite", function () {
     const nonFungibleTokenMintedReceipt = await mintedTokenInfo.wait();
     const nonFungibleTokeMintedSerialNumbers = nonFungibleTokenMintedReceipt.events.filter(e => e.event === "MintedNft")[0].args[0];
 
+    let signer0PrivateKey = config.networks.relay.accounts[0];
+    console.log(signer0PrivateKey)
+    await utils.associateWithSigner(signer0PrivateKey, fungibleTokenAddress, operatorId, operatorKey);
+   // await utils.associateWithSigner(signer0PrivateKey, nonFungibleTokenAddress, operatorId, operatorKey);
     let signer1PrivateKey = config.networks.relay.accounts[1];
     console.log(signer1PrivateKey)
     await utils.associateWithSigner(signer1PrivateKey, fungibleTokenAddress, operatorId, operatorKey);
     await utils.associateWithSigner(signer1PrivateKey, nonFungibleTokenAddress, operatorId, operatorKey);
 
-    const accountAmountSender = {
-      accountID: senderAccountID,
-      amount: -10,
-      isApproval: false
-    };
-    const accountAmountReceiver = {
-      accountID: receiverAccountID,
-      amount: 10,
-      isApproval: false
-    };
+    await safeOperationsContract.safeGrantTokenKycPublic(fungibleTokenAddress, signers[0].address);
+    await safeOperationsContract.safeGrantTokenKycPublic(fungibleTokenAddress, signers[1].address);
+    await safeOperationsContract.safeGrantTokenKycPublic(nonFungibleTokenAddress, signers[0].address);
+    await safeOperationsContract.safeGrantTokenKycPublic(nonFungibleTokenAddress, signers[1].address);
+
+    await safeOperationsContract.safeTransferTokenPublic(fungibleTokenAddress, safeOperationsContract.address, signers[0].address, 100);
    
     const transferList = {
       transfers: [
@@ -156,7 +156,7 @@ describe.only("SafeHTS library Test Suite", function () {
       }],
     },
     {
-      token: nonFungibleTokenAddress,
+      token: fungibleTokenAddress,
       transfers: [
         {
           accountID: receiverAccountID,
@@ -172,7 +172,24 @@ describe.only("SafeHTS library Test Suite", function () {
 
     const cryptoTransferTx = await safeOperationsContract.safeCryptoTransferPublic(transferList, tokenTransferList);
     const cryptoTransferReceipt = await cryptoTransferTx.wait()
-    expect(cryptoTransferReceipt.events.filter(e => e.event === 'ResponseCode')[0].args).to.be.true;
+    expect(cryptoTransferReceipt.events.filter(e => e.event === 'ResponseCode')[0].args[0]).to.equal(22);
+//add expects before and after transfer
+//amount of the hbar for signer0 and signer1
+//amount of the fungible token signer0 and signer1
+//signer0 should be 100
+//owner of nft1 should be signer0 before the transfer
+//after transfer hbars of the signer0 to be less with 10 000
+//signer1 to be + 10 000
+//ft signer0 -10 
+//ft signer1 to be +10
+//expect owner nft after transfer to be signer1
+ethers.provider.getBalance(signer0.address)
+//new contract
+const newContract = ethers.getContractAt("ERC20Mock", fungibleTokenAddress) 
+let ftBalance = await newContract.balanceOf(signer0.address) //balance of fungible token expexted 10
 
+//Owner of fungibleToken 
+const nftMockContract =  ethers.getContractAt("ERC721Mock", nonFungibleTokenAddress) 
+nftMockContract.ownerOf(nonFungibleTokenAddress, nftSerial)
   });
 });
