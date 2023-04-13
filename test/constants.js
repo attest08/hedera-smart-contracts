@@ -96,3 +96,4 @@ const TOKEN_SYMBOL = "tokenSymbol";
 module.exports = {
     Events, Path, Contract, CALL_EXCEPTION, GAS_LIMIT_1_000_000, GAS_LIMIT_10_000_000, GAS_LIMIT_800000, GAS_LIMIT_8000000, TOKEN_NAME, TOKEN_SYMBOL
 }
+

@@ -72,3 +72,4 @@ let DiamondHelper = {
 module.exports = {
   DiamondHelper
 }
+
