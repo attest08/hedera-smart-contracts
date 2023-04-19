@@ -14,17 +14,10 @@ describe.only("SafeHTS library Test Suite", function () {
 
   before(async function () {
     safeOperationsContract = await deploySafeOperationsContract();
-    console.log('safeOperationsContract: ' + safeOperationsContract.address);
-
     safeViewOperationsContract = await deploySafeViewOperationsContract();
-    console.log('safeViewOperationsContract: ' + safeViewOperationsContract.address);
     signers = await ethers.getSigners();
-
     fungibleTokenAddress = await createFungibleToken();
-    console.log(fungibleTokenAddress)
-
     nonFungibleTokenAddress = await createNonFungibleToken();
-    console.log(nonFungibleTokenAddress)
 
   });
 
@@ -108,38 +101,46 @@ describe.only("SafeHTS library Test Suite", function () {
   });
 
   it("should be able to transfer tokens and hbars atomically", async function () {
-    const senderAccountID = signers[0].address
-    const receiverAccountID = signers[1].address
+    const signer1AccountID = signers[0].address
+    const signer2AccountID = signers[1].address
 
     const amount = 0;
-    const mintedTokenInfo = await safeOperationsContract.safeMintTokenPublic(nonFungibleTokenAddress, amount, [nftSerial], { gasLimit: 1_000_000 });
+    const signer1initialAmount = 100
+    const transferredAmount = 10
+    const mintedTokenInfo = await safeOperationsContract.safeMintTokenPublic(nonFungibleTokenAddress, amount, ["0x00"], { gasLimit: 1_000_000 });
     const nonFungibleTokenMintedReceipt = await mintedTokenInfo.wait();
     const nonFungibleTokeMintedSerialNumbers = nonFungibleTokenMintedReceipt.events.filter(e => e.event === "MintedNft")[0].args[0];
 
     let signer0PrivateKey = config.networks.relay.accounts[0];
-    console.log(signer0PrivateKey)
     await utils.associateWithSigner(signer0PrivateKey, fungibleTokenAddress, operatorId, operatorKey);
-   // await utils.associateWithSigner(signer0PrivateKey, nonFungibleTokenAddress, operatorId, operatorKey);
     let signer1PrivateKey = config.networks.relay.accounts[1];
-    console.log(signer1PrivateKey)
     await utils.associateWithSigner(signer1PrivateKey, fungibleTokenAddress, operatorId, operatorKey);
     await utils.associateWithSigner(signer1PrivateKey, nonFungibleTokenAddress, operatorId, operatorKey);
 
-    await safeOperationsContract.safeGrantTokenKycPublic(fungibleTokenAddress, signers[0].address);
-    await safeOperationsContract.safeGrantTokenKycPublic(fungibleTokenAddress, signers[1].address);
-    await safeOperationsContract.safeGrantTokenKycPublic(nonFungibleTokenAddress, signers[0].address);
-    await safeOperationsContract.safeGrantTokenKycPublic(nonFungibleTokenAddress, signers[1].address);
+    await safeOperationsContract.safeGrantTokenKycPublic(fungibleTokenAddress, signer1AccountID);
+    await safeOperationsContract.safeGrantTokenKycPublic(fungibleTokenAddress, signer2AccountID);
+    await safeOperationsContract.safeGrantTokenKycPublic(nonFungibleTokenAddress, signer1AccountID);
+    await safeOperationsContract.safeGrantTokenKycPublic(nonFungibleTokenAddress, signer2AccountID);
 
-    await safeOperationsContract.safeTransferTokenPublic(fungibleTokenAddress, safeOperationsContract.address, signers[0].address, 100);
-   
+    await safeOperationsContract.safeTransferTokenPublic(fungibleTokenAddress, safeOperationsContract.address, signer1AccountID, signer1initialAmount);
+    const signers0BeforeHbarBalance = await signers[0].provider.getBalance(signer1AccountID);
+    const signers1BeforeHbarBalance = await signers[0].provider.getBalance(signer2AccountID);
+
+    const erc20Mock = await ethers.getContractAt('contracts/erc-20/ERC20Mock.sol:ERC20Mock', fungibleTokenAddress);
+    const signers0BeforeTokenBalance = parseInt(await erc20Mock.balanceOf(signer1AccountID));
+    const signers1BeforeTokenBalance = parseInt(await erc20Mock.balanceOf(signer2AccountID));
+
+    const erc721Mock = await ethers.getContractAt('contracts/erc-721/ERC721Mock.sol:ERC721Mock', nonFungibleTokenAddress);
+    const nftOwnerBefore = await erc721Mock.ownerOf(parseInt(nonFungibleTokeMintedSerialNumbers));
+
     const transferList = {
       transfers: [
         {
-          accountID: senderAccountID,
+          accountID: signer1AccountID, //sender
           amount: -10_000
         },
         {
-          accountID: receiverAccountID,
+          accountID: signer2AccountID, //receiver
           amount: 10_000
         }
       ]
@@ -150,8 +151,8 @@ describe.only("SafeHTS library Test Suite", function () {
       token: nonFungibleTokenAddress,
       transfers: [],
       nftTransfers: [{
-        senderAccountID: senderAccountID,
-        receiverAccountID: receiverAccountID,
+        senderAccountID: signer1AccountID, //sender
+        receiverAccountID: signer2AccountID, //receiver
         serialNumber: nonFungibleTokeMintedSerialNumbers[0],
       }],
     },
@@ -159,12 +160,12 @@ describe.only("SafeHTS library Test Suite", function () {
       token: fungibleTokenAddress,
       transfers: [
         {
-          accountID: receiverAccountID,
-          amount: 10,
+          accountID: signer2AccountID, //receiver
+          amount: transferredAmount,
         },
         {
-          accountID: senderAccountID,
-          amount: -10,
+          accountID: signer1AccountID, //sender
+          amount: -transferredAmount,
         },
       ],
       nftTransfers: [],
@@ -173,23 +174,20 @@ describe.only("SafeHTS library Test Suite", function () {
     const cryptoTransferTx = await safeOperationsContract.safeCryptoTransferPublic(transferList, tokenTransferList);
     const cryptoTransferReceipt = await cryptoTransferTx.wait()
     expect(cryptoTransferReceipt.events.filter(e => e.event === 'ResponseCode')[0].args[0]).to.equal(22);
-//add expects before and after transfer
-//amount of the hbar for signer0 and signer1
-//amount of the fungible token signer0 and signer1
-//signer0 should be 100
-//owner of nft1 should be signer0 before the transfer
-//after transfer hbars of the signer0 to be less with 10 000
-//signer1 to be + 10 000
-//ft signer0 -10 
-//ft signer1 to be +10
-//expect owner nft after transfer to be signer1
-ethers.provider.getBalance(signer0.address)
-//new contract
-const newContract = ethers.getContractAt("ERC20Mock", fungibleTokenAddress) 
-let ftBalance = await newContract.balanceOf(signer0.address) //balance of fungible token expexted 10
 
-//Owner of fungibleToken 
-const nftMockContract =  ethers.getContractAt("ERC721Mock", nonFungibleTokenAddress) 
-nftMockContract.ownerOf(nonFungibleTokenAddress, nftSerial)
+    const signers0AfterHbarBalance = await signers[0].provider.getBalance(signer1AccountID);
+    const signers1AfterHbarBalance = await signers[0].provider.getBalance(signer2AccountID);
+    const signers0AfterTokenBalance = parseInt(await erc20Mock.balanceOf(signer1AccountID));
+    const signers1AfterTokenBalance = parseInt(await erc20Mock.balanceOf(signer2AccountID));
+
+    const hbarTransferableAmount = ethers.BigNumber.from(10_000 * 10_000_000_000);
+    expect(signers0AfterHbarBalance).to.be.lessThan(signers0BeforeHbarBalance.sub(hbarTransferableAmount));
+    expect(signers1AfterHbarBalance).to.equal(signers1BeforeHbarBalance.add(hbarTransferableAmount));
+
+    const nftOwnerAfter = await erc721Mock.ownerOf(parseInt(nonFungibleTokeMintedSerialNumbers));
+    expect(nftOwnerBefore).not.to.equal(nftOwnerAfter)
+
+    expect(signers0AfterTokenBalance).to.equal(signers0BeforeTokenBalance - transferredAmount);
+    expect(signers1AfterTokenBalance).to.equal(signers1BeforeTokenBalance + transferredAmount);
   });
 });

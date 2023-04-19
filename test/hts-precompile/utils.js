@@ -369,7 +369,7 @@ class Utils {
         signerPk.toString() // DER encoded
     );
 
-    const transaction = await new TokenAssociateTransaction()
+    const transaction = new TokenAssociateTransaction()
         .setAccountId(AccountId.fromString(accountIdAsString))
         .setTokenIds([TokenId.fromSolidityAddress(tokenAddress)])
         .freezeWith(signerClient);
@@ -378,7 +378,6 @@ class Utils {
     const txResponse = await signTx.execute(signerClient);
     const receipt = await txResponse.getReceipt(signerClient);
     const transactionStatus = receipt.status;
-    console.log("The transaction consensus status " +transactionStatus.toString());
   }
 }
 
